@@ -13,10 +13,10 @@ env:
 jobs:
   collect-runs:
     runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
     steps:
       - name: Collect workflow runs across org
-        env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
           set -euo pipefail
 
@@ -64,8 +64,6 @@ jobs:
           echo "has_failures=$has_failures" >> "$GITHUB_ENV"
 
       - name: Update dashboard issue
-        env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
           # Look for existing dashboard issue
           existing=$(gh issue list --repo "$ORG/.github" --label "cicd-dashboard" --state open --json number --jq '.[0].number' 2>/dev/null || true)
@@ -88,10 +86,10 @@ jobs:
           fi
 
       - name: Add dashboard issue to project
-        env:
-          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
         run: |
+          sleep 3
           issue_url=$(gh issue list --repo "$ORG/.github" --label "cicd-dashboard" --state open --json url --jq '.[0].url')
+          echo "Issue URL: $issue_url"
           if [ -n "$issue_url" ] && [ "$issue_url" != "null" ]; then
-            gh project item-add "$PROJECT_NUMBER" --owner "$ORG" --url "$issue_url" 2>/dev/null || true
+            gh project item-add "$PROJECT_NUMBER" --owner "$ORG" --url "$issue_url"
           fi
