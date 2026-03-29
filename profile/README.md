@@ -63,7 +63,9 @@ Archive and analyze your Bluesky likes, threads, and activity with local AI.
 | [edgy](https://github.com/underveil-stacks/edgy) | Internal HAProxy router with Docker label discovery |
 | [authy](https://github.com/underveil-stacks/authy) | SSO/OIDC — Authelia + LLDAP + Redis |
 | [webby](https://github.com/underveil-stacks/webby) | Nginx static hosting and platform dashboard |
+| [llm-stack](https://github.com/underveil-stacks/llm-stack) | Local LLM inference — llama.cpp, OpenAI-compatible API, mTLS |
 | [victoriametrics](https://github.com/underveil-stacks/victoriametrics) | VictoriaMetrics + VictoriaLogs observability stack |
+| [grafana](https://github.com/underveil-stacks/grafana) | Grafana dashboards for platform observability |
 | [proton-bridge-docker](https://github.com/underveil-stacks/proton-bridge-docker) | Headless Proton Mail Bridge container (amd64/arm64) |
 | [proton-imap-client](https://github.com/underveil-stacks/proton-imap-client) | Go library for IMAP access via Proton Bridge |
 
@@ -76,13 +78,15 @@ Internet
   └── public-proxy  (Hetzner VPS — HAProxy + WireGuard + Let's Encrypt)
         └── WireGuard tunnel ──→ Raspberry Pi 5
                                     └── edgy  (HAProxy, Docker label routing)
-                                          ├── authy         (Authelia SSO + LLDAP)
-                                          ├── webby         (dashboard + static sites)
-                                          ├── manuals-api   (docs platform)
-                                          ├── life-api      (personal data hub)
-                                          ├── rivulet       (feed aggregation)
-                                          ├── pbj           (bullet journal)
-                                          └── victoriametrics (metrics + logs)
+                                          ├── authy           (Authelia SSO + LLDAP)
+                                          ├── webby           (dashboard + static sites)
+                                          ├── manuals-api     (docs platform)
+                                          ├── life-api        (personal data hub)
+                                          ├── rivulet         (feed aggregation)
+                                          ├── pbj             (bullet journal)
+                                          ├── llm-stack       (local LLM inference, mTLS)
+                                          ├── victoriametrics (metrics + logs)
+                                          └── grafana         (dashboards)
 ```
 
 ---
@@ -91,7 +95,7 @@ Internet
 
 - **Go + Vue 3** across all application stacks
 - **SQLite** as the primary datastore (+ FTS5 full-text, sqlite-vec for vectors)
-- **Local AI** — Ollama + nomic-embed-text, no cloud AI dependencies
+- **Local AI** — llm-stack provides OpenAI-compatible LLM and embedding APIs; no cloud AI dependencies
 - **MCP-native** — Manuals, Life, and PBJ expose MCP servers for Claude
 - **Authelia SSO** — single sign-on across all web-facing services
 - **Docker + Makefile** — consistent deployment pattern throughout
