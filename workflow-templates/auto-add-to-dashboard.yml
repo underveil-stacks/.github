@@ -1,0 +1,13 @@
+name: Auto-add to Dashboard
+
+on:
+  issues:
+    types: [opened]
+  pull_request_target:
+    types: [opened]
+
+jobs:
+  add-to-dashboard:
+    uses: underveil-stacks/.github/.github/workflows/auto-add-to-dashboard.yml@main
+    secrets:
+      ORG_ADMIN_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}

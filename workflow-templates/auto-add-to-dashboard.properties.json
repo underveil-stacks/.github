@@ -1,0 +1,6 @@
+{
+  "name": "Auto-add to Dashboard",
+  "description": "Automatically adds new issues and PRs to the org-wide Issues & PRs Dashboard project",
+  "iconName": "octicon project",
+  "categories": ["Automation"]
+}
