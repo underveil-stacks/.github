@@ -88,6 +88,78 @@ Rules:
 - Returns `503 Service Unavailable` with a descriptive error if any backend is unreachable.
 - Used by orchestrators (Docker healthcheck, edgy discovery, deployment verification).
 
+## AI Skill Document
+
+Every service should maintain an **AI skill document** — a Markdown file that teaches an AI agent how to use the API in a single read. This document is:
+
+1. **Stored in the repo** as `docs/guides/<SERVICE>_API_SKILL.md`
+2. **Embedded in the binary** via `go:embed` and served at `/docs`
+3. **Registered as a Claude Code skill** in the project's `.claude/settings.json`
+
+### Required Sections
+
+The skill doc must include, in order:
+
+1. **One-line description** — what the service is and where it runs
+2. **Bootstrap sequence** — numbered steps to go from zero to a working session:
+   - Verify the wrapper script exists
+   - Check `.env` has required variables (`<SERVICE>_API_KEY`, `<SERVICE>_HOST`)
+   - Test authentication (e.g., `GET /me` or `GET /health`)
+   - Discover capabilities via `/about`
+   - Fetch the OpenAPI spec for parameter details
+3. **Wrapper script usage** — how to use `scripts/<service>-api`
+4. **Quick reference** — the highest-traffic curl patterns grouped by domain (no need to list every endpoint — that's what `/openapi.yaml` is for)
+5. **Key conventions** — response format, pagination, date filtering, auth-free endpoints
+
+### Why This Matters
+
+The skill doc is what an AI agent reads on first invocation. It replaces the need to hardcode API knowledge into prompts. Because it's served from the running binary at `/docs`, it's always current with the deployed version — no stale context.
+
+### Example: Engram
+
+```markdown
+# Engram API Access
+
+You have access to Engram — a semantic memory storage platform backed by
+PostgreSQL + pgvector. It runs behind the edgy reverse proxy at
+`api.engram.webby.sigler.io`.
+
+## Setup
+
+**Required environment variables** (check `.env` in the repo root):
+- `ENGRAM_API_KEY` — Bearer token for authentication
+- `ENGRAM_HOST` — API hostname (e.g., `api.engram.webby.sigler.io`)
+
+**Wrapper script:**
+scripts/engram-api METHOD /path [json-body]
+
+**Verify connectivity:**
+scripts/engram-api GET /health  # should return {"status":"ok"}
+...
+```
+
+See also: [Life API skill doc](https://github.com/underveil-stacks/life-api/issues/18) for a more detailed example with calendar, email, and search patterns.
+
+## Wrapper Script Convention
+
+Every service should provide `scripts/<service>-api` — a shell script that:
+
+- Loads `.env` from the repo root
+- Reads `<SERVICE>_API_KEY` and `<SERVICE>_HOST`
+- Accepts `METHOD /path [json-body]` as arguments
+- Auto-prefixes paths with `/api/v1`
+- Sets `Authorization: Bearer` and `Content-Type: application/json` headers
+
+This gives AI agents and developers a consistent interface across all services:
+
+```bash
+scripts/engram-api GET /health
+scripts/life-api GET /profile
+scripts/pbj-api GET /tasks/due
+```
+
+The wrapper script should be documented in the skill doc and referenced from `/docs`.
+
 ## Auth Bypass
 
 The middleware must skip Bearer token validation for these exact paths:
@@ -99,12 +171,18 @@ The middleware must skip Bearer token validation for these exact paths:
 
 All other routes require authentication.
 
-## Reference Implementation
+## Reference Implementations
 
-[Engram](https://github.com/underveil-stacks/engram) is the reference implementation:
-
+**[Engram](https://github.com/underveil-stacks/engram):**
 - `/about` handler: `internal/api/handler_system.go`
 - OpenAPI generation: `internal/api/openapi.go`
 - Embedded docs: `docs/embed.go` + `docs/guides/ENGRAM_API_SKILL.md`
+- Wrapper script: `scripts/engram-api`
 - Auth bypass: `internal/api/middleware.go`
 - Health check: `internal/api/handler_system.go` (pings PostgreSQL)
+
+**[Life API](https://github.com/underveil-stacks/life-api):**
+- `/about` with structured `capabilities`, `quick_start`, and `ai_skill` fields
+- `/openapi.json` (JSON variant)
+- Wrapper script: `scripts/life-api`
+- Bootstrap sequence covering profile, calendar, email, PBJ, and semantic search
