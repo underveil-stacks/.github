@@ -68,6 +68,7 @@ networks:
 | `edgy.auth` | No | Auth requirement: `required` or `bypass` | `bypass` |
 | `edgy.backend.ssl` | No | Backend speaks TLS | `true` |
 | `edgy.backend.timeout` | No | Custom backend timeout | `120s` |
+| `edgy.auth.bypass.paths` | No | Path prefixes that skip Authelia (comma-separated) | `/about,/.well-known` |
 | `edgy.cors.origin` | No | Allowed CORS origins (comma-separated) | `https://app.example.com` |
 
 ### Network
@@ -118,6 +119,20 @@ Authelia forward-auth is enforced. HAProxy checks with Authelia before forwardin
 - Any service without its own auth layer
 
 **Bearer token bypass**: Services with `edgy.auth=required` still allow requests with `Authorization: Bearer *` headers through without Authelia. This lets API clients authenticate directly with the service while browser users go through Authelia.
+
+### `edgy.auth.bypass.paths` (per-path bypass)
+
+Services with `edgy.auth=required` can selectively expose specific path prefixes without Authelia:
+
+```yaml
+labels:
+  - "edgy.auth=required"
+  - "edgy.auth.bypass.paths=/about,/.well-known,/api/v1/health"
+```
+
+Requests matching any listed prefix are served directly; all other paths still require Authelia authentication. This is the recommended pattern for services that need public discovery endpoints (`/about`, `/.well-known/ai-discovery`) while keeping the rest protected.
+
+The bypass is implemented at the HAProxy level via `path_beg` ACLs and a `txn.skip_auth` variable — no changes needed in the service itself.
 
 ## Health Checks
 

@@ -187,7 +187,9 @@ The wrapper script should be documented in the skill doc and referenced from `/d
 
 ## Auth Bypass
 
-The middleware must skip Bearer token validation for these exact paths:
+### Application-Level Bypass
+
+The service middleware must skip Bearer token validation for these exact paths:
 
 - `/about`
 - `/.well-known/ai-discovery`
@@ -197,6 +199,18 @@ The middleware must skip Bearer token validation for these exact paths:
 - `/api/v1/health`
 
 All other routes require authentication.
+
+### Proxy-Level Bypass (edgy)
+
+Services running behind edgy with `edgy.auth=required` must also declare path-level bypasses so Authelia doesn't block the discovery endpoints:
+
+```yaml
+labels:
+  - "edgy.auth=required"
+  - "edgy.auth.bypass.paths=/about,/.well-known,/api/v1/about,/api/v1/openapi.yaml,/api/v1/docs,/api/v1/health"
+```
+
+Services with `edgy.auth=bypass` don't need this — Authelia is never invoked. See the [service deployment standard](../infrastructure/service-deployment.md#edgyauthbypasspaths-per-path-bypass) for details.
 
 ## Reference Implementations
 
