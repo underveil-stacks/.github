@@ -1,32 +1,47 @@
 # Public Discovery Endpoints
 
-Every underveil-stacks service must expose four unauthenticated endpoints that allow AI agents and clients to bootstrap themselves without prior knowledge of the API.
+Every underveil-stacks service must expose unauthenticated endpoints that allow AI agents and clients to bootstrap themselves without prior knowledge of the API — including the URL prefix.
+
+## Zero-Knowledge Discovery
+
+An agent encountering a service for the first time knows only the hostname. It should not need to guess `/api/v1/` or any other prefix. Two root-level endpoints solve this:
+
+| Endpoint | Behavior |
+|---|---|
+| `GET /about` | Returns the full discovery payload (same as `/api/v1/about`) |
+| `GET /.well-known/ai-discovery` | 302 redirect to `/about` ([RFC 8615](https://www.rfc-editor.org/rfc/rfc8615)) |
+
+**`/about`** is the canonical discovery endpoint. An agent hits it, learns the API prefix, capabilities, auth requirements, and where to find the spec and docs — all in one request.
+
+**`/.well-known/ai-discovery`** exists for RFC-compliant clients that probe well-known URIs. It redirects to `/about` so there is one source of truth.
 
 ## Required Endpoints
 
 | Endpoint | Content-Type | Purpose |
 |---|---|---|
-| `GET /api/v1/about` | `application/json` | Platform identity, capabilities, auth requirements, endpoint map |
+| `GET /about` | `application/json` | Root-level discovery — platform identity, capabilities, auth, endpoint map |
+| `GET /.well-known/ai-discovery` | (302 redirect) | RFC 8615 discovery → redirects to `/about` |
+| `GET /api/v1/about` | `application/json` | Same payload as `/about` (versioned path) |
 | `GET /api/v1/openapi.yaml` | `application/yaml` | Full OpenAPI 3.0 spec with all endpoints and schemas |
 | `GET /api/v1/docs` | `text/markdown` | Usage guide with worked examples and curl patterns |
 | `GET /api/v1/health` | `application/json` | Backend connectivity check |
 
-All four are **public** (no authentication required). Every other route requires a valid Bearer token.
+All are **public** (no authentication required). Every other route requires a valid Bearer token.
 
 ## Bootstrap Sequence
 
 An AI agent discovering a new service follows this sequence:
 
-1. **`/about`** — learn what the service does, how auth works, and where to find detail
-2. **`/openapi.yaml`** — get the machine-readable API contract
-3. **`/docs`** — get the human-readable guide with worked examples
-4. **`/health`** — confirm the service is live before making authenticated calls
+1. **`GET /about`** (or `/.well-known/ai-discovery`) — learn what the service does, the API prefix, how auth works, and where to find detail
+2. **`/api/v1/openapi.yaml`** — get the machine-readable API contract
+3. **`/api/v1/docs`** — get the human-readable guide with worked examples
+4. **`/api/v1/health`** — confirm the service is live before making authenticated calls
 
 ## Endpoint Specifications
 
-### `GET /api/v1/about`
+### `GET /about` and `GET /api/v1/about`
 
-Returns a JSON object describing the service. This is the **single entry point** an agent needs.
+Both return the same JSON object describing the service. `/about` is the root-level entry point; `/api/v1/about` is the versioned equivalent.
 
 Required fields:
 
@@ -50,13 +65,23 @@ Required fields:
     "about": "/api/v1/about",
     "docs": "/api/v1/docs"
   },
+  "discovery": {
+    "about": "/about",
+    "well_known_ai_discovery": "/.well-known/ai-discovery",
+    "note": "GET /about returns this payload directly. GET /.well-known/ai-discovery redirects to /about (RFC 8615)."
+  },
   "source": "https://github.com/underveil-stacks/<repo>"
 }
 ```
 
 - `capabilities` is an array of strings, not structured data. Keep each entry concise and self-explanatory.
-- `endpoints` maps logical names to paths. Include at minimum the four public endpoints. Add service-specific entry points as appropriate.
+- `endpoints` maps logical names to versioned paths (`/api/v1/...`).
+- `discovery` maps the root-level discovery endpoints. An agent uses these to find `endpoints`.
 - `source` links to the GitHub repository.
+
+### `GET /.well-known/ai-discovery`
+
+Returns a `302 Found` redirect to `/about`. This follows [RFC 8615](https://www.rfc-editor.org/rfc/rfc8615) for well-known URIs. No payload — just a redirect.
 
 ### `GET /api/v1/openapi.yaml`
 
@@ -164,6 +189,8 @@ The wrapper script should be documented in the skill doc and referenced from `/d
 
 The middleware must skip Bearer token validation for these exact paths:
 
+- `/about`
+- `/.well-known/ai-discovery`
 - `/api/v1/about`
 - `/api/v1/openapi.yaml`
 - `/api/v1/docs`
