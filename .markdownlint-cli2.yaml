@@ -1,0 +1,27 @@
+# markdownlint configuration for underveil-stacks standards
+# https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+
+config:
+  # Allow long lines — standards docs have tables and URLs
+  MD013: false
+
+  # Allow duplicate headings across sibling sections (e.g., "Reference Implementations")
+  MD024:
+    siblings_only: true
+
+  # Allow inline HTML
+  MD033: false
+
+  # Allow bare URLs in prose
+  MD034: false
+
+  # Hard tabs — disabled because Makefile code blocks require tabs
+  MD010: false
+
+  # Blanks around lists — disabled because the org style puts lists
+  # directly after "Rules:", "Use for:", etc. without a blank line
+  MD032: false
+
+  # Table column spacing — disabled because the org uses compact pipe style
+  # consistently across all existing docs (e.g., |---|---|)
+  MD060: false

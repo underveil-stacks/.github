@@ -1,0 +1,23 @@
+# lychee link checker configuration
+# https://lychee.cli.rs/usage/config/
+
+# Accept 200 and 429 (rate limited — common with GitHub)
+accept = [200, 429]
+
+# GitHub links get rate-limited aggressively without a token
+# The CI workflow sets GITHUB_TOKEN automatically
+
+# Skip links that require authentication
+exclude = [
+  # Private repo links that may not be accessible from CI
+  "https://github.com/underveil-stacks/life-api/issues/",
+]
+
+# Timeout per request
+timeout = 30
+
+# Max retries for transient failures
+max_retries = 3
+
+# Don't check mail addresses
+exclude_mail = true

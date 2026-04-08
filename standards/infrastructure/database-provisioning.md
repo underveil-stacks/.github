@@ -4,7 +4,7 @@ How to provision a PostgreSQL database for a new underveil-stacks service. Datab
 
 ## Connection Architecture
 
-```
+```text
 Service container (rpi-dev-01)
     │
     │  PostgreSQL wire protocol, plaintext
@@ -32,7 +32,7 @@ One role owns the database and handles everything — migrations, DML, extension
 
 **Examples:** Atelier, Manuals Platform
 
-```
+```text
 Database: <service>
 Role:     <service>_app (owner, LOGIN, CREATE + USAGE on public schema)
 ```
@@ -46,7 +46,7 @@ Separate roles for migrations, application runtime, and read-only access. Use th
 
 **Example:** Engram
 
-```
+```text
 Database: <service>_<env>
 Roles:
   <service>_migrate   — owner, runs DDL (CREATE TABLE, ALTER, etc.)
@@ -81,7 +81,8 @@ All databases use:
 | Template | template0 |
 
 Role flags (non-owner):
-```
+
+```text
 LOGIN, NOSUPERUSER, NOCREATEDB, NOCREATEROLE
 ```
 

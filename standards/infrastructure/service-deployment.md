@@ -4,7 +4,7 @@ How to deploy a service behind the underveil-stacks proxy infrastructure. Servic
 
 ## Traffic Flow
 
-```
+```text
 Internet (HTTPS)
     │
     ▼
@@ -87,7 +87,7 @@ Use `expose` (not `ports`) to make the service reachable on the Docker network w
 
 All services use the `*.webby.sigler.io` domain:
 
-```
+```text
 <service>.webby.sigler.io        — for standalone services
 <subdomain>.<service>.webby.sigler.io  — for service sub-components (e.g., api.engram)
 ```
@@ -243,7 +243,7 @@ Key points:
 
 Containers on `edgy_backend` can reach other services via HAProxy's DNS aliases at `172.18.0.100:80`:
 
-```
+```text
 http://api.engram.webby.sigler.io:80/api/v1/health
 ```
 

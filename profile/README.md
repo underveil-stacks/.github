@@ -9,6 +9,7 @@ All services run on a home Raspberry Pi, reachable from the internet via a Hetzn
 ## Platforms
 
 ### Manuals — Documentation Management
+
 Store, tag, and semantically search personal and technical documentation.
 
 | Repo | Description |
@@ -20,6 +21,7 @@ Store, tag, and semantically search personal and technical documentation.
 | [manuals-cli](https://github.com/underveil-stacks/manuals-cli) | Go CLI companion tool (public) |
 
 ### Life — Personal Data Hub
+
 Aggregate email, calendar, packages, and journal entries into a single Claude-accessible store.
 
 | Repo | Description |
@@ -30,6 +32,7 @@ Aggregate email, calendar, packages, and journal entries into a single Claude-ac
 | [life-email-agent](https://github.com/underveil-stacks/life-email-agent) | Proton Mail ingest daemon |
 
 ### Rivulet — Feed Aggregation
+
 Multi-user RSS/Atom/Podcast/Mastodon/Bluesky feed aggregator with workflow automation and semantic search.
 
 | Repo | Description |
@@ -38,6 +41,7 @@ Multi-user RSS/Atom/Podcast/Mastodon/Bluesky feed aggregator with workflow autom
 | [rivulet-web](https://github.com/underveil-stacks/rivulet-web) | Vue 3 + Vuetify 3 + TypeScript frontend |
 
 ### PBJ — Personal Bullet Journal
+
 Fully offline bullet journal with true bullet-journal semantics and native Claude integration via MCP.
 
 | Repo | Description |
@@ -45,6 +49,7 @@ Fully offline bullet journal with true bullet-journal semantics and native Claud
 | [pbj](https://github.com/underveil-stacks/pbj) | Go + SQLite + sqlite-vec + Ollama, Raspberry Pi 5 |
 
 ### Bluesky Archival
+
 Archive and analyze your Bluesky likes, threads, and activity with local AI.
 
 | Repo | Description |
@@ -73,7 +78,7 @@ Archive and analyze your Bluesky likes, threads, and activity with local AI.
 
 ## Architecture
 
-```
+```text
 Internet
   └── public-proxy  (Hetzner VPS — HAProxy + WireGuard + Let's Encrypt)
         └── WireGuard tunnel ──→ Raspberry Pi 5
