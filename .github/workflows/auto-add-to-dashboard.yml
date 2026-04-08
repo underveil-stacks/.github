@@ -1,0 +1,35 @@
+name: Auto-add to Issues & PRs Dashboard
+
+# This reusable workflow is called from individual repos
+# to automatically add new issues and PRs to the org dashboard.
+
+on:
+  workflow_call:
+    secrets:
+      ORG_ADMIN_TOKEN:
+        required: true
+
+env:
+  ORG: underveil-stacks
+  PROJECT_NUMBER: 2
+
+jobs:
+  add-to-project:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Determine item URL
+        id: url
+        run: |
+          if [ "${{ github.event_name }}" = "issues" ]; then
+            echo "url=${{ github.event.issue.html_url }}" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" = "pull_request" ] || [ "${{ github.event_name }}" = "pull_request_target" ]; then
+            echo "url=${{ github.event.pull_request.html_url }}" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Add to project
+        if: steps.url.outputs.url != ''
+        env:
+          GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+        run: |
+          gh project item-add "$PROJECT_NUMBER" --owner "$ORG" --url "${{ steps.url.outputs.url }}"
+          echo "Added ${{ steps.url.outputs.url }} to Issues & PRs Dashboard"

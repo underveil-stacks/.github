@@ -1,0 +1,95 @@
+name: CI/CD Runs Dashboard
+
+on:
+  schedule:
+    # Run every 6 hours
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
+
+env:
+  ORG: underveil-stacks
+  PROJECT_NUMBER: 3
+
+jobs:
+  collect-runs:
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ secrets.ORG_ADMIN_TOKEN }}
+    steps:
+      - name: Collect workflow runs across org
+        run: |
+          set -euo pipefail
+
+          echo "# CI/CD Runs Report — $(date -u '+%Y-%m-%d %H:%M UTC')" > report.md
+          echo "" >> report.md
+
+          # Get all repos in the org
+          repos=$(gh api --paginate orgs/$ORG/repos --jq '.[].name' | sort)
+
+          echo "| Repository | Workflow | Status | Branch | Updated |" >> report.md
+          echo "|------------|----------|--------|--------|---------|" >> report.md
+
+          has_failures=false
+
+          for repo in $repos; do
+            # Get the most recent run per workflow
+            runs=$(gh api "repos/$ORG/$repo/actions/runs?per_page=30" \
+              --jq '.workflow_runs | group_by(.workflow_id) | map(sort_by(.updated_at) | reverse | .[0]) | .[] | [.name, .conclusion // .status, .head_branch, .updated_at, .html_url] | @tsv' 2>/dev/null || true)
+
+            if [ -n "$runs" ]; then
+              while IFS=$'\t' read -r name conclusion branch updated url; do
+                # Determine status emoji
+                case "$conclusion" in
+                  success)    status_icon="pass" ;;
+                  failure)    status_icon="FAIL"; has_failures=true ;;
+                  cancelled)  status_icon="cancelled" ;;
+                  in_progress|queued|waiting) status_icon="running" ;;
+                  *)          status_icon="$conclusion" ;;
+                esac
+
+                # Format the date
+                short_date=$(echo "$updated" | cut -c1-16 | tr 'T' ' ')
+
+                echo "| $repo | [$name]($url) | $status_icon | $branch | $short_date |" >> report.md
+              done <<< "$runs"
+            fi
+          done
+
+          echo "" >> report.md
+          echo "_Generated automatically by [cicd-dashboard.yml](https://github.com/$ORG/.github/actions)_" >> report.md
+
+          cat report.md
+
+          # Save for next step
+          echo "has_failures=$has_failures" >> "$GITHUB_ENV"
+
+      - name: Update dashboard issue
+        run: |
+          # Look for existing dashboard issue
+          existing=$(gh issue list --repo "$ORG/.github" --label "cicd-dashboard" --state open --json number --jq '.[0].number' 2>/dev/null || true)
+
+          body=$(cat report.md)
+
+          if [ -n "$existing" ] && [ "$existing" != "null" ]; then
+            gh issue edit "$existing" --repo "$ORG/.github" --body "$body" \
+              --title "CI/CD Runs Dashboard — $(date -u '+%Y-%m-%d')"
+            echo "Updated issue #$existing"
+          else
+            gh label create cicd-dashboard --repo "$ORG/.github" \
+              --description "Auto-updated CI/CD status dashboard" \
+              --color "0075ca" 2>/dev/null || true
+            gh issue create --repo "$ORG/.github" \
+              --title "CI/CD Runs Dashboard — $(date -u '+%Y-%m-%d')" \
+              --body "$body" \
+              --label "cicd-dashboard"
+            echo "Created new dashboard issue"
+          fi
+
+      - name: Add dashboard issue to project
+        run: |
+          sleep 3
+          issue_url=$(gh issue list --repo "$ORG/.github" --label "cicd-dashboard" --state open --json url --jq '.[0].url')
+          echo "Issue URL: $issue_url"
+          if [ -n "$issue_url" ] && [ "$issue_url" != "null" ]; then
+            gh project item-add "$PROJECT_NUMBER" --owner "$ORG" --url "$issue_url"
+          fi
