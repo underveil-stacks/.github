@@ -1,0 +1,303 @@
+name: Reusable Release (Go service)
+
+# Org-wide reusable release pipeline for Go services.
+#
+# One place to change how every service releases. It gates a release on the
+# test suite, `go vet`, and a govulncheck scan of reachable code; cross-compiles
+# each requested binary for each GOOS/GOARCH; and publishes a SINGLE GitHub
+# Release with a merged SHA256SUMS covering every asset. The single-publish
+# design fixes the concurrent action-gh-release clobber hazard in the old
+# per-arch-matrix variant, where each matrix leg raced to create the same
+# release (422 / partial-asset releases).
+#
+# See internal-docs/standards/infrastructure/ci-cd-practices.md.
+#
+# Minimal caller (single binary, default linux/arm64 + linux/amd64):
+#
+#   name: Release
+#   on:
+#     push:
+#       tags: ['v*']
+#   permissions:
+#     contents: write          # required: the reusable workflow publishes a Release
+#   jobs:
+#     release:
+#       uses: underveil-stacks/.github/.github/workflows/release-go-service.yml@main
+#       with:
+#         binaries: '[{"name":"pbj-api","main":"./cmd/server"}]'
+#
+# Multi-binary caller (e.g. wisp):
+#
+#       with:
+#         binaries: >-
+#           [{"name":"wisp-server","main":"./cmd/server"},
+#            {"name":"wisp-migrate","main":"./cmd/migrate"},
+#            {"name":"wisp","main":"./cmd/wisp"}]
+#
+# GoReleaser caller (repo owns a .goreleaser.yaml; life-api / music-enrich):
+#
+#       with:
+#         goreleaser: true
+#         binaries: '[]'        # ignored in goreleaser mode
+
+on:
+  workflow_call:
+    inputs:
+      binaries:
+        description: >-
+          JSON array of {"name","main"} objects. `name` is the binary base name
+          (the asset is published as <name>-<goos>-<goarch>); `main` is the main
+          package path (e.g. ./cmd/server). Ignored when goreleaser: true.
+        type: string
+        required: true
+      targets:
+        description: JSON array of "goos/goarch" strings to cross-compile.
+        type: string
+        default: '["linux/arm64","linux/amd64"]'
+      go-version:
+        description: Explicit Go version. Empty (default) uses go-version-file.
+        type: string
+        default: ''
+      go-version-file:
+        description: File to read the Go version from when go-version is empty.
+        type: string
+        default: go.mod
+      cgo-enabled:
+        description: CGO_ENABLED value for the build ('0' or '1').
+        type: string
+        default: '0'
+      trimpath:
+        description: Pass -trimpath to go build.
+        type: boolean
+        default: true
+      ldflags-extra:
+        description: Extra flags appended to -ldflags (after the version stamps).
+        type: string
+        default: ''
+      test-args:
+        description: Package selector for `go test` and `go vet`.
+        type: string
+        default: ./...
+      run-tests:
+        description: Run `go test` before building. Leave on unless a repo has a genuine reason.
+        type: boolean
+        default: true
+      run-vet:
+        description: Run `go vet` before building.
+        type: boolean
+        default: true
+      govulncheck:
+        description: Run govulncheck against reachable code and fail on findings.
+        type: boolean
+        default: true
+      govulncheck-version:
+        description: Version of the govulncheck tool to install (a security scanner; latest tracks the newest vuln DB tooling).
+        type: string
+        default: latest
+      extra-files:
+        description: Newline-separated globs of additional files to attach to the Release.
+        type: string
+        default: ''
+      goreleaser:
+        description: Use GoReleaser (repo-owned .goreleaser.yaml) instead of the build+release matrix.
+        type: boolean
+        default: false
+      prerelease-when:
+        description: Mark the Release as a prerelease when the tag contains one of these (comma-separated) substrings.
+        type: string
+        default: '-rc,-beta,-alpha'
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Gate: no untested or vulnerable code reaches a Release.
+  # ---------------------------------------------------------------------------
+  test:
+    name: Test & scan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
+
+      - name: go vet
+        if: ${{ inputs.run-vet }}
+        run: go vet ${{ inputs.test-args }}
+
+      - name: go test
+        if: ${{ inputs.run-tests }}
+        run: go test ${{ inputs.test-args }}
+
+      - name: govulncheck
+        if: ${{ inputs.govulncheck }}
+        # govulncheck exits non-zero only when a vulnerability is reachable from
+        # this module's code (call-graph analysis), so this fails on findings
+        # that actually affect the build, not on every advisory in the dep tree.
+        run: |
+          go install golang.org/x/vuln/cmd/govulncheck@${{ inputs.govulncheck-version }}
+          govulncheck ${{ inputs.test-args }}
+
+  # ---------------------------------------------------------------------------
+  # Cross-compile matrix (skipped in GoReleaser mode).
+  # ---------------------------------------------------------------------------
+  build:
+    name: Build ${{ matrix.target }}
+    if: ${{ !inputs.goreleaser }}
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: false
+      matrix:
+        target: ${{ fromJSON(inputs.targets) }}
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Resolve target
+        id: tgt
+        run: |
+          t='${{ matrix.target }}'
+          {
+            echo "goos=${t%%/*}"
+            echo "goarch=${t##*/}"
+            echo "slug=${t//\//-}"
+          } >> "$GITHUB_OUTPUT"
+
+      - name: Cross-compile
+        env:
+          GOOS: ${{ steps.tgt.outputs.goos }}
+          GOARCH: ${{ steps.tgt.outputs.goarch }}
+          CGO_ENABLED: ${{ inputs.cgo-enabled }}
+          BINARIES: ${{ inputs.binaries }}
+          VERSION: ${{ github.ref_name }}
+          COMMIT: ${{ github.sha }}
+          LDFLAGS_EXTRA: ${{ inputs.ldflags-extra }}
+        run: |
+          set -euo pipefail
+          BUILD_TIME=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+          # main.version / main.gitCommit / main.buildTime are the stamps every
+          # service reads for /about and --version. -X on a symbol a given
+          # binary doesn't define is silently ignored by the Go linker.
+          LDFLAGS="-w -s -X main.version=${VERSION} -X main.gitCommit=${COMMIT} -X main.buildTime=${BUILD_TIME} ${LDFLAGS_EXTRA}"
+          TRIMPATH=""
+          if [ "${{ inputs.trimpath }}" = "true" ]; then TRIMPATH="-trimpath"; fi
+          mkdir -p dist
+          mapfile -t rows < <(printf '%s' "$BINARIES" | jq -c '.[]')
+          if [ "${#rows[@]}" -eq 0 ]; then
+            echo "::error::inputs.binaries is empty; provide at least one {name,main} object"
+            exit 1
+          fi
+          for row in "${rows[@]}"; do
+            name=$(printf '%s' "$row" | jq -r '.name')
+            main=$(printf '%s' "$row" | jq -r '.main')
+            out="dist/${name}-${GOOS}-${GOARCH}"
+            echo "Building $out from $main (GOOS=$GOOS GOARCH=$GOARCH CGO_ENABLED=$CGO_ENABLED)"
+            go build ${TRIMPATH} -ldflags="$LDFLAGS" -o "$out" "$main"
+          done
+          ls -l dist
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7
+        with:
+          name: dist-${{ steps.tgt.outputs.slug }}
+          path: dist/
+          retention-days: 1
+          if-no-files-found: error
+
+  # ---------------------------------------------------------------------------
+  # Publish exactly one Release from a single job after all legs complete.
+  # ---------------------------------------------------------------------------
+  release:
+    name: Publish release
+    if: ${{ !inputs.goreleaser }}
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download all binaries
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8
+        with:
+          path: dist
+          pattern: dist-*
+          merge-multiple: true
+
+      - name: Generate SHA256SUMS
+        run: |
+          set -euo pipefail
+          cd dist
+          # Exclude any pre-existing SHA256SUMS so the digest file never hashes
+          # itself; one merged file covers every asset (ci-cd-practices.md).
+          mapfile -t files < <(find . -maxdepth 1 -type f ! -name SHA256SUMS -printf '%P\n' | sort)
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "::error::no binaries were downloaded from the build matrix"
+            exit 1
+          fi
+          sha256sum "${files[@]}" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: Determine prerelease
+        id: pre
+        env:
+          TAG: ${{ github.ref_name }}
+          MARKERS: ${{ inputs.prerelease-when }}
+        run: |
+          set -euo pipefail
+          pre=false
+          IFS=',' read -ra markers <<< "$MARKERS"
+          for m in "${markers[@]}"; do
+            [ -n "$m" ] || continue
+            case "$TAG" in *"$m"*) pre=true ;; esac
+          done
+          echo "prerelease=$pre" >> "$GITHUB_OUTPUT"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@b4309332981a82ec1c5618f44dd2e27cc8bfbfda # v3
+        with:
+          files: |
+            dist/*
+            ${{ inputs.extra-files }}
+          generate_release_notes: true
+          draft: false
+          prerelease: ${{ steps.pre.outputs.prerelease }}
+
+  # ---------------------------------------------------------------------------
+  # GoReleaser mode: repo owns .goreleaser.yaml (matrix + checksums live there).
+  # ---------------------------------------------------------------------------
+  goreleaser:
+    name: GoReleaser
+    if: ${{ inputs.goreleaser }}
+    needs: test
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Go
+        uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ inputs.go-version }}
+          go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Run GoReleaser
+        uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
+        with:
+          version: latest
+          args: release --clean
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
