@@ -1,0 +1,35 @@
+# Canonical Dependabot config for a Go service repo.
+#
+# Dependabot config is NOT inheritable org-wide — every repo needs its own copy.
+# Copy this file to `.github/dependabot.yml` in the target repo.
+#
+# For a repo that also ships an SPA (a `package.json` / lockfile), add the npm
+# ecosystem block from templates/dependabot-spa.yml.
+
+version: 2
+updates:
+  # Go module dependencies — the large, unscanned surface.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      # Batch patch/minor bumps into one PR to cut review churn; majors stay
+      # individual so breaking changes are reviewed on their own.
+      go-minor-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "deps(go)"
+
+  # GitHub Actions — keeps SHA pins current. Dependabot understands SHA-pinned
+  # actions and bumps both the SHA and the trailing version comment.
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps(actions)"

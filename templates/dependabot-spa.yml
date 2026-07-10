@@ -1,0 +1,44 @@
+# Dependabot config for a repo that ships an SPA / Node front-end
+# (e.g. manuals-webui). Copy to `.github/dependabot.yml`.
+#
+# Same as templates/dependabot.yml plus the npm ecosystem. Set `directory` to
+# wherever the package.json / lockfile lives (root here; use e.g. "/web" if the
+# SPA is in a subdir).
+
+version: 2
+updates:
+  - package-ecosystem: npm
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      npm-minor-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "deps(npm)"
+
+  # Include gomod as well if the repo also has a Go module; drop it for a
+  # pure-frontend repo.
+  - package-ecosystem: gomod
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    groups:
+      go-minor-patch:
+        update-types:
+          - minor
+          - patch
+    commit-message:
+      prefix: "deps(go)"
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 10
+    commit-message:
+      prefix: "deps(actions)"
