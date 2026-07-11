@@ -23,8 +23,16 @@ name: Reusable Release (Go service)
 #   jobs:
 #     release:
 #       uses: underveil-stacks/.github/.github/workflows/release-go-service.yml@main
+#       secrets: inherit       # required: exposes the org GO_MODULE_APP_* secrets
 #       with:
 #         binaries: '[{"name":"pbj-api","main":"./cmd/server"}]'
+#
+# Private modules: services import github.com/underveil-stacks/webby-mesh-auth
+# (and possibly other private org modules). Every Go job mints a short-lived
+# installation token from the org's Go Module GitHub App (GO_MODULE_APP_ID /
+# GO_MODULE_APP_PRIVATE_KEY — the ci-cd-practices.md house pattern) and wires
+# git insteadOf + GOPRIVATE. Callers MUST pass `secrets: inherit`. A repo with
+# no private imports can set `private-modules: false`.
 #
 # Multi-binary caller (e.g. wisp):
 #
@@ -106,6 +114,14 @@ on:
         description: Mark the Release as a prerelease when the tag contains one of these (comma-separated) substrings.
         type: string
         default: '-rc,-beta,-alpha'
+      private-modules:
+        description: >-
+          Mint a Go Module App installation token and configure git/GOPRIVATE so
+          `go` can fetch private org modules (e.g. webby-mesh-auth). Requires the
+          caller to pass `secrets: inherit`. Disable only for repos with no
+          private imports.
+        type: boolean
+        default: true
 
 jobs:
   # ---------------------------------------------------------------------------
@@ -124,6 +140,21 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Mint Go-module App token
+        if: ${{ inputs.private-modules }}
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GO_MODULE_APP_ID }}
+          private-key: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY }}
+          owner: underveil-stacks
+
+      - name: Configure private modules
+        if: ${{ inputs.private-modules }}
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          echo "GOPRIVATE=github.com/underveil-stacks/*" >> "$GITHUB_ENV"
 
       - name: go vet
         if: ${{ inputs.run-vet }}
@@ -164,6 +195,21 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Mint Go-module App token
+        if: ${{ inputs.private-modules }}
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GO_MODULE_APP_ID }}
+          private-key: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY }}
+          owner: underveil-stacks
+
+      - name: Configure private modules
+        if: ${{ inputs.private-modules }}
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          echo "GOPRIVATE=github.com/underveil-stacks/*" >> "$GITHUB_ENV"
 
       - name: Resolve target
         id: tgt
@@ -293,6 +339,21 @@ jobs:
         with:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version-file }}
+
+      - name: Mint Go-module App token
+        if: ${{ inputs.private-modules }}
+        id: app-token
+        uses: actions/create-github-app-token@fee1f7d63c2ff003460e3d139729b119787bc349 # v2
+        with:
+          app-id: ${{ secrets.GO_MODULE_APP_ID }}
+          private-key: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY }}
+          owner: underveil-stacks
+
+      - name: Configure private modules
+        if: ${{ inputs.private-modules }}
+        run: |
+          git config --global url."https://x-access-token:${{ steps.app-token.outputs.token }}@github.com/".insteadOf "https://github.com/"
+          echo "GOPRIVATE=github.com/underveil-stacks/*" >> "$GITHUB_ENV"
 
       - name: Run GoReleaser
         uses: goreleaser/goreleaser-action@e435ccd777264be153ace6237001ef4d979d3a7a # v6
