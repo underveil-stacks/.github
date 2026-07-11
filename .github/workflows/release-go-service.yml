@@ -63,11 +63,17 @@ on:
         type: string
         default: '["linux/arm64","linux/amd64"]'
       go-version:
-        description: Explicit Go version. Empty (default) uses go-version-file.
+        description: >-
+          Go toolchain for the release build. Default 'stable' = latest stable
+          Go release, so binaries always ship with current stdlib security
+          patches (the org toolchain policy from internal-docs#66). Set an
+          explicit version, or set this to '' with go-version-file to pin from
+          a file — but expect govulncheck to fail the release when the pinned
+          toolchain's stdlib has reachable vulnerabilities.
         type: string
-        default: ''
+        default: 'stable'
       go-version-file:
-        description: File to read the Go version from when go-version is empty.
+        description: File to read the Go version from when go-version is ''.
         type: string
         default: go.mod
       cgo-enabled:
@@ -139,7 +145,8 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ inputs.go-version }}
-          go-version-file: ${{ inputs.go-version-file }}
+          go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
+          check-latest: true
 
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
@@ -194,7 +201,8 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ inputs.go-version }}
-          go-version-file: ${{ inputs.go-version-file }}
+          go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
+          check-latest: true
 
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
@@ -338,7 +346,8 @@ jobs:
         uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
         with:
           go-version: ${{ inputs.go-version }}
-          go-version-file: ${{ inputs.go-version-file }}
+          go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
+          check-latest: true
 
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
