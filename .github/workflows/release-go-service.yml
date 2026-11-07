@@ -148,6 +148,17 @@ jobs:
           go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
           check-latest: true
 
+      - name: Check the Go-module App secrets reach this repo
+        if: ${{ inputs.private-modules }}
+        env:
+          HAS_ID: ${{ secrets.GO_MODULE_APP_ID != '' }}
+          HAS_KEY: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_ID" != true ] || [ "$HAS_KEY" != true ]; then
+            echo "::error title=Go-module App secrets not available::GO_MODULE_APP_ID / GO_MODULE_APP_PRIVATE_KEY are empty in ${GITHUB_REPOSITORY}. Either the caller doesn't pass secrets (use 'secrets: inherit'), or this repo isn't on those org secrets' selected-repositories list. A new, recreated or re-imported repo has a new ID and must be added in org settings > Secrets and variables > Actions. See ci-cd-practices.md."
+            exit 1
+          fi
+
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
         id: app-token
@@ -203,6 +214,17 @@ jobs:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
           check-latest: true
+
+      - name: Check the Go-module App secrets reach this repo
+        if: ${{ inputs.private-modules }}
+        env:
+          HAS_ID: ${{ secrets.GO_MODULE_APP_ID != '' }}
+          HAS_KEY: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_ID" != true ] || [ "$HAS_KEY" != true ]; then
+            echo "::error title=Go-module App secrets not available::GO_MODULE_APP_ID / GO_MODULE_APP_PRIVATE_KEY are empty in ${GITHUB_REPOSITORY}. Either the caller doesn't pass secrets (use 'secrets: inherit'), or this repo isn't on those org secrets' selected-repositories list. A new, recreated or re-imported repo has a new ID and must be added in org settings > Secrets and variables > Actions. See ci-cd-practices.md."
+            exit 1
+          fi
 
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
@@ -348,6 +370,17 @@ jobs:
           go-version: ${{ inputs.go-version }}
           go-version-file: ${{ inputs.go-version == '' && inputs.go-version-file || '' }}
           check-latest: true
+
+      - name: Check the Go-module App secrets reach this repo
+        if: ${{ inputs.private-modules }}
+        env:
+          HAS_ID: ${{ secrets.GO_MODULE_APP_ID != '' }}
+          HAS_KEY: ${{ secrets.GO_MODULE_APP_PRIVATE_KEY != '' }}
+        run: |
+          if [ "$HAS_ID" != true ] || [ "$HAS_KEY" != true ]; then
+            echo "::error title=Go-module App secrets not available::GO_MODULE_APP_ID / GO_MODULE_APP_PRIVATE_KEY are empty in ${GITHUB_REPOSITORY}. Either the caller doesn't pass secrets (use 'secrets: inherit'), or this repo isn't on those org secrets' selected-repositories list. A new, recreated or re-imported repo has a new ID and must be added in org settings > Secrets and variables > Actions. See ci-cd-practices.md."
+            exit 1
+          fi
 
       - name: Mint Go-module App token
         if: ${{ inputs.private-modules }}
